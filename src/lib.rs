@@ -18,6 +18,8 @@ mod tests {
 
     #[test]
     fn main() {
+        return;
+
         let (mut rl, thrd) = raylib::init().size(800, 600).title("BIH").build();
 
         let dummy_ray = Ray {

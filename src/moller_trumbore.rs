@@ -17,6 +17,23 @@ pub struct Ray {
     pub inormal: Vec3,
 }
 
+pub fn new_hit() -> Hit {
+    Hit {
+        t: 0.0,
+        u: 0.0,
+        v: 0.0,
+    }
+}
+
+pub fn new_ray(origin: Vec3, normal: Vec3) -> Ray {
+    let inormal = normal.map(|x| 1. / x);
+    Ray {
+        origin,
+        normal,
+        inormal,
+    }
+}
+
 pub fn test_intersection(ray: &Ray, p0: Vec3, p1: Vec3, p2: Vec3, out: &mut Hit) -> bool {
     let edge1 = p1 - p0;
     let edge2 = p2 - p0;
@@ -75,3 +92,49 @@ pub fn test_intersection(ray: &Ray, p0: Vec3, p1: Vec3, p2: Vec3, out: &mut Hit)
 //     out.v = vcoord;
 //     (test1 as i32 * test2 as i32 * test3 as i32) != 0
 // }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const P0: Vec3 = Vec3::new(-1.0, 0.0, 1.0);
+    const P1: Vec3 = Vec3::new(1.0, 0.0, 1.0);
+    const P2: Vec3 = Vec3::new(0.0, 1.5, 1.0);
+
+    #[test]
+    fn test_hit() {
+        let origin: Vec3 = Vec3::zero();
+        let normal: Vec3 = Vec3::new(0.0, 0.0, 1.0);
+        let ray: Ray = new_ray(origin, normal);
+        let mut hit: Hit = new_hit();
+        let res: bool = test_intersection(&ray, P0, P1, P2, &mut hit);
+        assert!(res);
+        assert!(hit.t == 1.0);
+    }
+
+    #[test]
+    fn test_hit_neg() {
+        let origin: Vec3 = Vec3::zero();
+        let normal: Vec3 = Vec3::new(0.0, 0.0, -1.0);
+        let ray: Ray = new_ray(origin, normal);
+        let mut hit: Hit = new_hit();
+        let res: bool = test_intersection(&ray, P0, P1, P2, &mut hit);
+        assert!(res);
+    }
+
+    #[test]
+    fn test_epsilon() {
+        let origin: Vec3 = Vec3::zero();
+        // Shoot the ray just above the typ of the triangle.
+        let normal: Vec3 = (P2.clone() + Vec3::new(0.0, EPS, 0.0)).normalized();
+        let ray: Ray = new_ray(origin, normal);
+        let mut hit: Hit = new_hit();
+        let res: bool = test_intersection(&ray, P0, P1, P2, &mut hit);
+        assert!(!res);
+        // Shoot the ray just above the typ of the triangle.
+        let normal: Vec3 = (P2.clone() + Vec3::new(0.0, -EPS, 0.0)).normalized();
+        let ray: Ray = new_ray(origin, normal);
+        let res: bool = test_intersection(&ray, P0, P1, P2, &mut hit);
+        assert!(res);
+    }
+}

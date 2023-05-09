@@ -132,8 +132,8 @@ pub fn compute_bih(
                 } else {
                     let exts = crate::aabb::extents(local_bbox);
 
-                    let maxdim = index_of_max(&exts);
-                    let mut dim = maxdim;
+                    let maxdim: u8 = index_of_max(&exts);
+                    let mut dim: u8 = maxdim;
 
                     'retry: loop {
                         let d = dim as usize;
