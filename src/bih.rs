@@ -1,4 +1,5 @@
 use crate::aabb::Aabb;
+use std::fmt;
 use ultraviolet::vec as uv;
 use uv::Vec3;
 
@@ -58,6 +59,7 @@ pub fn sort_objects(
         let box_min = left_box.mins[dim];
         let box_max = left_box.maxs[dim];
         let middle = (box_min + box_max) * 0.5;
+        // println!("  box={}, {middle}, {half_dim}", left_box);
         if middle <= half_dim {
             left_obj += 1;
             lclip = f32::max(lclip, box_max);
@@ -84,13 +86,13 @@ struct StackFrame {
 }
 
 pub fn index_of_max(vec: &Vec3) -> u8 {
-    if vec[0] > vec[1] {
-        if vec[0] > vec[2] {
+    if vec[0] >= vec[1] {
+        if vec[0] >= vec[2] {
             0
         } else {
             2
         }
-    } else if vec[1] > vec[2] {
+    } else if vec[1] >= vec[2] {
         1
     } else {
         2
@@ -118,6 +120,7 @@ pub fn compute_bih(
     let mut cursor: usize = 0;
 
     'construction: loop {
+        println!("popping");
         match stack.pop() {
             None => break 'construction,
             Some(mut frame) => {
@@ -127,26 +130,33 @@ pub fn compute_bih(
                 let local_bbox = &mut frame.bbox;
                 if stop - start < leaf_bound {
                     let node = Node::Leaf { start, stop };
-                    //                    println!("At {:?}, wrote {:?}", frame.node_index, node);
+                    println!("{:?}", node);
                     nodes[frame.node_index] = node;
                 } else {
                     let exts = crate::aabb::extents(local_bbox);
 
                     let maxdim: u8 = index_of_max(&exts);
+                    println!("exts={}, maxdim={}", crate::aabb::DisplayVec3(exts), maxdim);
                     let mut dim: u8 = maxdim;
+
+                    // TODO: debug this construction
 
                     'retry: loop {
                         let d = dim as usize;
                         let half_dim = (local_bbox.mins[d] + local_bbox.maxs[d]) * 0.5;
+                        println!("dim={}, box={}, half-dim={}", d, local_bbox, half_dim);
                         let (left_end, lclip, rclip, lmin, rmax) =
                             sort_objects(bboxes, index, half_dim, d, start, stop + 1);
 
                         if left_end == stop + 1 {
+                            println!("all objects in left half");
                             if rmax < half_dim {
+                                println!("pushing: focusing on left box");
                                 local_bbox.maxs[d] = half_dim;
                                 stack.push(frame);
-                                break 'retry;
+                                continue 'construction;
                             } else {
+                                println!("left_end={}, rmax={rmax}", left_end);
                                 let next = (dim + 1) % 3;
                                 if next == maxdim {
                                     nodes[frame.node_index] = Node::Leaf { start, stop };
@@ -156,10 +166,12 @@ pub fn compute_bih(
                                 }
                             }
                         } else if left_end == start {
+                            println!("all objects in right half");
                             if half_dim < lmin {
+                                println!("pushing: focusing on right box");
                                 local_bbox.mins[d] = half_dim;
                                 stack.push(frame);
-                                break 'retry;
+                                continue 'construction;
                             } else {
                                 let next = (dim + 1) % 3;
                                 if next == maxdim {
@@ -197,10 +209,14 @@ pub fn compute_bih(
                                 left: left_index,
                                 right: right_index,
                             };
+                            println!(
+                                "left={},{}, right={},{}",
+                                left.start, left.stop, right.start, right.stop
+                            );
                             stack.push(right);
                             stack.push(left);
                             nodes[frame.node_index] = node;
-                            break 'retry;
+                            continue 'construction;
                         }
                     }
                 }
@@ -231,5 +247,51 @@ pub fn alloc<E: Elt>(state: &E::State, objects: &[E::T], leaf_bound: usize) -> B
         nodes,
         boxes,
         global,
+    }
+}
+
+pub fn debug(bih: &BihState, node_index: usize, depth: usize) -> String {
+    let node = &bih.nodes[node_index];
+    match node {
+        Node::Leaf { start, stop } => format!(
+            "{:width$}Leaf start={start} stop={stop}\n",
+            "",
+            width = depth
+        ),
+        Node::Node {
+            axis,
+            leftclip,
+            rightclip,
+            left,
+            right,
+        } => {
+            let left = debug(bih, *left, depth + 1);
+            let right = debug(bih, *right, depth + 1);
+            format!(
+                "Node axis={axis}, lclip={leftclip}, rclip={rightclip}\n{:width$}left={}\n{:width$}right={}\n",
+                "", left, "", right, width = depth
+            )
+        }
+    }
+}
+
+impl fmt::Display for BihState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", debug(self, 0, 1))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    pub fn test_sort_disjoint() {
+        let boxes: [Aabb; 0] = [];
+        let index: [usize; 0] = [];
+        let half_dim: f32 = 0.0;
+        let dim: usize = 0;
+        let left_obj = 0;
+        let right_obj = 0;
+        assert!(true);
     }
 }

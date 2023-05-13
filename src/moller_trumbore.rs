@@ -45,7 +45,7 @@ pub fn test_intersection(ray: &Ray, p0: Vec3, p1: Vec3, p2: Vec3, out: &mut Hit)
         let inv_det = 1.0 / det;
         let tvec = ray.origin - p0;
         let ucoord = Vec3::dot(&tvec, pvec) * inv_det;
-        if ucoord < 0.0 || ucoord > 1.0 {
+        if !(0.0..=1.0).contains(&ucoord) {
             false
         } else {
             pvec = Vec3::cross(&tvec, edge1);
@@ -126,13 +126,13 @@ mod tests {
     fn test_epsilon() {
         let origin: Vec3 = Vec3::zero();
         // Shoot the ray just above the typ of the triangle.
-        let normal: Vec3 = (P2.clone() + Vec3::new(0.0, EPS, 0.0)).normalized();
+        let normal: Vec3 = (P2 + Vec3::new(0.0, EPS, 0.0)).normalized();
         let ray: Ray = new_ray(origin, normal);
         let mut hit: Hit = new_hit();
         let res: bool = test_intersection(&ray, P0, P1, P2, &mut hit);
         assert!(!res);
         // Shoot the ray just above the typ of the triangle.
-        let normal: Vec3 = (P2.clone() + Vec3::new(0.0, -EPS, 0.0)).normalized();
+        let normal: Vec3 = (P2 + Vec3::new(0.0, -EPS, 0.0)).normalized();
         let ray: Ray = new_ray(origin, normal);
         let res: bool = test_intersection(&ray, P0, P1, P2, &mut hit);
         assert!(res);

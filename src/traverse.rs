@@ -1,6 +1,6 @@
 use crate::bih::{BihState, Node};
 use crate::moller_trumbore::{test_intersection, Hit, Ray};
-use crate::scene::{Scene, Triangle};
+use crate::scene::Scene;
 use ultraviolet::vec as uv;
 use uv::Vec3;
 
@@ -70,11 +70,11 @@ pub fn traverse(
             right,
         } => {
             let dim = *axis as usize;
-            println!("{}", dim);
+
             let ray_start = ray.origin[dim] + ray.normal[dim] * tmin;
             let ray_stop = ray.origin[dim] + ray.normal[dim] * tmax;
 
-            if ray.normal[dim] > 0.0 {
+            if ray.normal[dim] >= 0.0 {
                 // going left-to-right : first left, then right
                 if ray_start <= *leftclip {
                     // ray intersects left subspace
@@ -82,21 +82,23 @@ pub fn traverse(
                     // explore left
                     let left_hit = traverse(scene, bih, *left, ray, tmin, far_clip);
                     if leftclip <= rightclip {
-                        println!("left then right, no overlap");
                         // boxes do not overlap - we explore the right if
                         // we didn't hit anything in the left and the ray is nonempty in the right
                         match left_hit {
-                            None if (*rightclip <= ray_stop) => {
-                                let near_clip = f32::max(
-                                    (rightclip - ray.origin[dim]) * ray.inormal[dim],
-                                    tmin,
-                                );
-                                traverse(scene, bih, *right, ray, near_clip, tmax)
+                            None => {
+                                if *rightclip <= ray_stop {
+                                    let near_clip = f32::max(
+                                        (rightclip - ray.origin[dim]) * ray.inormal[dim],
+                                        tmin,
+                                    );
+                                    traverse(scene, bih, *right, ray, near_clip, tmax)
+                                } else {
+                                    None
+                                }
                             }
                             _ => left_hit,
                         }
                     } else if *rightclip <= ray_stop {
-                        println!("left then right, overlap");
                         // boxes do overlap - we have to explore both boxes and pick the nearest hit
                         let near_clip =
                             f32::max((rightclip - ray.origin[dim]) * ray.inormal[dim], tmin);
@@ -127,7 +129,6 @@ pub fn traverse(
             } else {
                 // going right-to-left : first right, then left
                 if *rightclip <= ray_start {
-                    println!("right then left, no overlap");
                     // ray intersects right subspace
                     let far_clip = f32::min((rightclip - ray.origin[dim]) * ray.inormal[dim], tmax);
                     // explore right
@@ -136,20 +137,25 @@ pub fn traverse(
                         // boxes do not overlap - we explore the right if
                         // we didn't hit anything in the left and the ray is nonempty in the right
                         match right_hit {
-                            None if (ray_stop <= *leftclip) => {
-                                let near_clip =
-                                    f32::max((leftclip - ray.origin[dim]) * ray.inormal[dim], tmin);
-                                traverse(scene, bih, *left, ray, near_clip, tmax)
+                            None => {
+                                if ray_stop <= *leftclip {
+                                    let near_clip = f32::max(
+                                        (leftclip - ray.origin[dim]) * ray.inormal[dim],
+                                        tmin,
+                                    );
+                                    traverse(scene, bih, *left, ray, near_clip, tmax)
+                                } else {
+                                    None
+                                }
                             }
                             _ => right_hit,
                         }
                     } else if ray_stop <= *leftclip {
-                        println!("right then left, overlap");
                         // boxes do overlap - we have to explore both boxes and pick the nearest hit
                         let near_clip =
                             f32::max((leftclip - ray.origin[dim]) * ray.inormal[dim], tmin);
                         let left_hit = traverse(scene, bih, *left, ray, near_clip, tmax);
-                        match (left_hit, right_hit) {
+                        match (right_hit, left_hit) {
                             (None, None) => None,
                             (None, x) | (x, None) => x,
                             (Some(x), Some(y)) => {
@@ -161,7 +167,6 @@ pub fn traverse(
                             }
                         }
                     } else {
-                        println!("right only");
                         // boxes do not overlap and ray stops before right subspace
                         right_hit
                     }

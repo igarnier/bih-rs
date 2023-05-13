@@ -9,7 +9,7 @@ pub mod traverse;
 #[cfg(test)]
 mod tests {
 
-    use crate::moller_trumbore::Ray;
+    use crate::moller_trumbore::{test_intersection, Ray};
 
     use ultraviolet::vec as uv;
     use uv::Vec3;
@@ -18,8 +18,6 @@ mod tests {
 
     #[test]
     fn main() {
-        return;
-
         let (mut rl, thrd) = raylib::init().size(800, 600).title("BIH").build();
 
         let dummy_ray = Ray {
@@ -35,9 +33,10 @@ mod tests {
 
         let bih = crate::scene::compute_bih(&scene, 5);
 
-        let mut rays = vec![vec![dummy_ray; 600]; 800];
+        let mut rays = vec![dummy_ray; 800 * 600];
         for x in 0..800 {
             for y in 0..600 {
+                let index = y * 800 + x;
                 let pixx = x as i32;
                 let pixy = y as i32;
                 let origin = Vec3::new(0.0, 0.0, -100.0);
@@ -49,7 +48,7 @@ mod tests {
                     normal,
                     inormal,
                 };
-                rays[x][y] = ray;
+                rays[index] = ray;
             }
         }
 
@@ -60,6 +59,8 @@ mod tests {
         };
 
         let mut iter = 0;
+
+        println!("{}", bih);
 
         'running: while !rl.window_should_close() {
             if iter > 300 {
@@ -75,11 +76,23 @@ mod tests {
             };
 
             for x in 0..800 {
-                let row = &rays[x][..];
                 for y in 0..600 {
-                    let ray = unsafe { row.get_unchecked(y) };
-                    //                    let hit = crate::moller_trumbore::test_intersection(ray, p0, p1, p2, &mut hit);
-                    let hit = crate::traverse::traverse(&scene, &bih, 0, ray, 0.0, 1000.0);
+                    let index = y * 800 + x;
+                    let ray = rays[index];
+
+                    let mut put_pixel = false;
+
+                    // for (v0, v1, v2) in crate::scene::iter_triangles (&scene) {
+                    //     if test_intersection (&ray, v0, v1, v2, &mut hit) {
+                    //         put_pixel = true;
+                    //     }
+                    // }
+
+                    // if put_pixel {
+                    //     d.draw_pixel (x as i32, y as i32, Color::RED);
+                    // }
+
+                    let hit = crate::traverse::traverse(&scene, &bih, 0, &ray, 0.0, 1000.0);
 
                     match hit {
                         None => (),
