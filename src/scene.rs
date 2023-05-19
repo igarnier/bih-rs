@@ -87,10 +87,6 @@ pub fn triangle_aabb(vbuffer: &[Vertex], triangle: &Triangle) -> Aabb {
     aabb = crate::aabb::join_point(&aabb, &p0);
     aabb = crate::aabb::join_point(&aabb, &p1);
     aabb = crate::aabb::join_point(&aabb, &p2);
-    println!(
-        "tri={:?}, {:?} {:?} {:?} = {:?}",
-        triangle, p0, p1, p2, aabb
-    );
     aabb
 }
 
@@ -158,23 +154,23 @@ pub fn add_wavefront_to_scene(scene: &mut Scene, fname: &str) {
 
         assert!(mesh.positions.len() % 3 == 0);
 
-        // for vtx in 0..mesh.positions.len() / 3 {
-        //     let v = Vec3::new(
-        //         200. * mesh.positions[3 * vtx],
-        //         200. * mesh.positions[3 * vtx + 1],
-        //         150. + 200. * mesh.positions[3 * vtx + 2],
-        //     );
-        //     vbuffer.push(v);
-        // }
-
         for vtx in 0..mesh.positions.len() / 3 {
             let v = Vec3::new(
-                3. * mesh.positions[3 * vtx],
-                3. * mesh.positions[3 * vtx + 1],
-                3. * mesh.positions[3 * vtx + 2],
+                200. * mesh.positions[3 * vtx],
+                200. * mesh.positions[3 * vtx + 1],
+                800. + 200. * mesh.positions[3 * vtx + 2],
             );
             vbuffer.push(v);
         }
+
+        // for vtx in 0..mesh.positions.len() / 3 {
+        //     let v = Vec3::new(
+        //         3. * mesh.positions[3 * vtx],
+        //         3. * mesh.positions[3 * vtx + 1],
+        //         3. * mesh.positions[3 * vtx + 2],
+        //     );
+        //     vbuffer.push(v);
+        // }
     }
 
     // let mut tbuffer: Vec<Triangle> = obj
@@ -197,7 +193,9 @@ pub fn add_wavefront_to_scene(scene: &mut Scene, fname: &str) {
             let v0 = vbuffer[t[0] as usize];
             let v1 = vbuffer[t[1] as usize];
             let v2 = vbuffer[t[2] as usize];
-            Vec3::cross(&(v2 - v0), v1 - v0)
+            let mut res = (v1 - v0).cross(v2 - v0);
+            res.normalize();
+            res
         })
         .collect();
 

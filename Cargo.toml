@@ -14,3 +14,4 @@ ultraviolet="0.9.0"
 tobj="3.2.3"
 libc="0.2.76"
 raylib="3.7.0"
+clap = { version = "4.2.7", features = ["derive"] }
