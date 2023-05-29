@@ -6,6 +6,7 @@ use uv::Vec3;
 
 pub fn intersect_ray(
     scene: &Scene,
+    index: &[usize],
     ray: &Ray,
     tmin: f32,
     tmax: f32,
@@ -23,7 +24,8 @@ pub fn intersect_ray(
     let nbuffer = &scene.nbuffer;
     let normal = ray.normal;
 
-    for i in *tri_start..=*tri_end {
+    for tri in *tri_start..=*tri_end {
+        let i = index[tri];
         let tri = tbuffer[i];
         let trin = nbuffer[i];
 
@@ -60,8 +62,13 @@ pub fn traverse(
     tmax: f32,
 ) -> Option<Hit> {
     let node = &bih.nodes[node_index];
+    if tmin >= tmax {
+        return None;
+    };
     match node {
-        Node::Leaf { start, stop } => intersect_ray(scene, ray, tmin, tmax, start, stop),
+        Node::Leaf { start, stop } => {
+            intersect_ray(scene, &bih.index, ray, tmin, tmax, start, stop)
+        }
         Node::Node {
             axis,
             leftclip,
@@ -81,6 +88,7 @@ pub fn traverse(
                     let far_clip = f32::min((leftclip - ray.origin[dim]) * ray.inormal[dim], tmax);
                     // explore left
                     let left_hit = traverse(scene, bih, *left, ray, tmin, far_clip);
+
                     if leftclip <= rightclip {
                         // boxes do not overlap - we explore the right if
                         // we didn't hit anything in the left and the ray is nonempty in the right
@@ -96,7 +104,7 @@ pub fn traverse(
                                     None
                                 }
                             }
-                            _ => left_hit,
+                            Some(_) => left_hit,
                         }
                     } else if *rightclip <= ray_stop {
                         // boxes do overlap - we have to explore both boxes and pick the nearest hit
@@ -133,6 +141,7 @@ pub fn traverse(
                     let far_clip = f32::min((rightclip - ray.origin[dim]) * ray.inormal[dim], tmax);
                     // explore right
                     let right_hit = traverse(scene, bih, *right, ray, tmin, far_clip);
+
                     if leftclip < rightclip {
                         // boxes do not overlap - we explore the right if
                         // we didn't hit anything in the left and the ray is nonempty in the right
@@ -155,6 +164,7 @@ pub fn traverse(
                         let near_clip =
                             f32::max((leftclip - ray.origin[dim]) * ray.inormal[dim], tmin);
                         let left_hit = traverse(scene, bih, *left, ray, near_clip, tmax);
+
                         match (right_hit, left_hit) {
                             (None, None) => None,
                             (None, x) | (x, None) => x,

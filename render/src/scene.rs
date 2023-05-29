@@ -2,6 +2,7 @@ use crate::aabb::Aabb;
 use crate::bih::BihState;
 use ultraviolet::vec as uv;
 use uv::Vec3;
+use wfront::loader::{Triangle as Tri, V3};
 
 // struct Light {
 //     position: Vec3,
@@ -76,6 +77,20 @@ pub fn empty() -> Scene {
     }
 }
 
+// pub fn triangle_aabb(vbuffer: &[Vertex], triangle: &Triangle) -> Aabb {
+//     let x = triangle[0] as usize;
+//     let y = triangle[1] as usize;
+//     let z = triangle[2] as usize;
+//     let p0 = vbuffer[x];
+//     let p1 = vbuffer[y];
+//     let p2 = vbuffer[z];
+//     let mut aabb = crate::aabb::EMPTY;
+//     aabb = crate::aabb::join_point(&aabb, &p0);
+//     aabb = crate::aabb::join_point(&aabb, &p1);
+//     aabb = crate::aabb::join_point(&aabb, &p2);
+//     aabb
+// }
+
 pub fn triangle_aabb(vbuffer: &[Vertex], triangle: &Triangle) -> Aabb {
     let x = triangle[0] as usize;
     let y = triangle[1] as usize;
@@ -83,11 +98,9 @@ pub fn triangle_aabb(vbuffer: &[Vertex], triangle: &Triangle) -> Aabb {
     let p0 = vbuffer[x];
     let p1 = vbuffer[y];
     let p2 = vbuffer[z];
-    let mut aabb = crate::aabb::EMPTY;
-    aabb = crate::aabb::join_point(&aabb, &p0);
-    aabb = crate::aabb::join_point(&aabb, &p1);
-    aabb = crate::aabb::join_point(&aabb, &p2);
-    aabb
+    let maxs = p0.max_by_component(p1).max_by_component(p2);
+    let mins = p0.min_by_component(p1).min_by_component(p2);
+    crate::aabb::make(mins, maxs)
 }
 
 pub fn add_object_to_scene(
@@ -99,10 +112,19 @@ pub fn add_object_to_scene(
     let vcount = scene.vbuffer.len();
 
     for t in tbuffer.iter_mut() {
-        let aabb = triangle_aabb(vbuffer, t);
         t[0] += vcount as u32;
         t[1] += vcount as u32;
         t[2] += vcount as u32;
+        let aabb = triangle_aabb(vbuffer, t);
+        // let p0 = vbuffer[t[0] as usize];
+        // let p1 = vbuffer[t[1] as usize];
+        // let p2 = vbuffer[t[2] as usize];
+        // println!(
+        //     "tri {:?} with coords {:?} has aabb {}",
+        //     t,
+        //     (p0, p1, p2),
+        //     aabb
+        // );
         scene.tbuffer.push(*t);
         scene.global = crate::aabb::join(&aabb, &scene.global);
         scene.bboxes.push(aabb);
@@ -112,8 +134,7 @@ pub fn add_object_to_scene(
 }
 
 pub fn add_wavefront_to_scene(scene: &mut Scene, fname: &str) {
-    let (models, _materials) =
-        tobj::load_obj(fname, &tobj::LoadOptions::default()).expect("Failed to OBJ load file");
+    let mesh = wfront::loader::load(fname);
 
     let mut tbuffer: Vec<Triangle> = Vec::new();
     let mut vbuffer: Vec<Vec3> = Vec::new();
@@ -121,72 +142,31 @@ pub fn add_wavefront_to_scene(scene: &mut Scene, fname: &str) {
 
     println!("adding {fname}");
 
-    for (_i, m) in models.iter().enumerate() {
-        let mesh = &m.mesh;
+    {
         // let mut next_face = 0;
 
         println!(
             "vertices = {}; triangles = {}",
-            mesh.positions.len(),
-            mesh.indices.len() / 3
+            mesh.vertices.len(),
+            mesh.triangles.len()
         );
 
-        let mut triangles: Vec<Triangle> =
-            mesh.indices.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
+        let mut triangles: Vec<Triangle> = mesh
+            .triangles
+            .iter()
+            .map(|Tri(t0, t1, t2)| [*t0 - 1, *t1 - 1, *t2 - 1])
+            .collect();
 
         tbuffer.append(&mut triangles);
 
-        // for face in 0..mesh.face_arities.len() {
-        //     let arity = mesh.face_arities[face] as usize;
-        //     assert!(arity == 3);
-        //     let end = next_face + mesh.face_arities[face] as usize;
+        assert!(mesh.vertices.len() % 3 == 0);
 
-        //     let tri = &mesh.indices[next_face..end];
-
-        //     tbuffer.push([
-        //         tri[0].try_into().unwrap(),
-        //         tri[1].try_into().unwrap(),
-        //         tri[2].try_into().unwrap(),
-        //     ]);
-
-        //     next_face = end;
-        // }
-
-        assert!(mesh.positions.len() % 3 == 0);
-
-        for vtx in 0..mesh.positions.len() / 3 {
-            let v = Vec3::new(
-                200. * mesh.positions[3 * vtx],
-                200. * mesh.positions[3 * vtx + 1],
-                800. + 200. * mesh.positions[3 * vtx + 2],
-            );
+        for V3(v0, v1, v2) in mesh.vertices {
+            let v = Vec3::new(200. * v0, 200. * v1, 800. + 200. * v2);
             vbuffer.push(v);
         }
-
-        // for vtx in 0..mesh.positions.len() / 3 {
-        //     let v = Vec3::new(
-        //         3. * mesh.positions[3 * vtx],
-        //         3. * mesh.positions[3 * vtx + 1],
-        //         3. * mesh.positions[3 * vtx + 2],
-        //     );
-        //     vbuffer.push(v);
-        // }
     }
 
-    // let mut tbuffer: Vec<Triangle> = obj
-    //     .indices
-    //     .chunks(3)
-    //     .map(|c| c.try_into().expect("slice with incorrect length"))
-    //     .collect();
-
-    // let mut vbuffer = obj
-    //     .vertices
-    //     .iter()
-    //     .map(|v| {
-    //         let p = v.position;
-    //         Vec3::new(p[0], p[1], p[2])
-    //     })
-    //     .collect();
     let mut nbuffer = tbuffer
         .iter()
         .map(|t| {
