@@ -6,12 +6,12 @@ use uv::Vec3;
 
 pub fn intersect_ray(
     scene: &Scene,
-    index: &[usize],
+    index: &[u32],
     ray: &Ray,
     tmin: f32,
     tmax: f32,
-    tri_start: &usize,
-    tri_end: &usize,
+    tri_start: &u32,
+    tri_end: &u32,
 ) -> Option<Hit> {
     let mut min_hit = Hit {
         t: f32::INFINITY,
@@ -25,7 +25,7 @@ pub fn intersect_ray(
     let normal = ray.normal;
 
     for tri in *tri_start..=*tri_end {
-        let i = index[tri];
+        let i = index[tri as usize] as usize;
         let tri = tbuffer[i];
         let trin = nbuffer[i];
 
@@ -56,12 +56,12 @@ pub fn intersect_ray(
 pub fn traverse(
     scene: &Scene,
     bih: &BihState,
-    node_index: usize,
+    node_index: u32,
     ray: &Ray,
     tmin: f32,
     tmax: f32,
 ) -> Option<Hit> {
-    let node = &bih.nodes[node_index];
+    let node = &bih.nodes[node_index as usize];
     if tmin >= tmax {
         return None;
     };

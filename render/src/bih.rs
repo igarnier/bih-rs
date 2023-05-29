@@ -3,11 +3,11 @@ use std::fmt;
 use ultraviolet::vec as uv;
 use uv::Vec3;
 
-pub type ObjIndex = usize;
+pub type ObjIndex = u32;
 
 pub type Dim = u8;
 
-pub type NodeIndex = usize;
+pub type NodeIndex = u32;
 
 #[derive(Debug)]
 pub enum Node {
@@ -40,22 +40,22 @@ pub struct BihState {
 
 pub fn sort_objects(
     bboxes: &[Aabb],
-    index: &mut [usize],
+    index: &mut [u32],
     half_dim: f32,
     dim: usize,
-    left_obj: usize,
-    right_obj: usize,
+    left_obj: u32,
+    right_obj: u32,
 ) -> (ObjIndex, f32, f32, f32, f32) {
     assert!(left_obj < right_obj);
-    let mut left_obj: usize = left_obj;
-    let mut right_obj: usize = right_obj;
+    let mut left_obj: u32 = left_obj;
+    let mut right_obj: u32 = right_obj;
     let mut lclip: f32 = -f32::MAX;
     let mut rclip: f32 = f32::MAX;
     let mut lmin: f32 = f32::MAX;
     let mut rmax: f32 = -f32::MAX;
 
     while right_obj >= left_obj {
-        let left_box = &bboxes[index[left_obj]];
+        let left_box = &bboxes[index[left_obj as usize] as usize];
         let box_min = left_box.mins[dim];
         let box_max = left_box.maxs[dim];
         let middle = (box_min + box_max) * 0.5;
@@ -65,7 +65,7 @@ pub fn sort_objects(
             left_obj += 1;
             lclip = f32::max(lclip, box_max);
         } else {
-            index.swap(left_obj, right_obj);
+            index.swap(left_obj as usize, right_obj as usize);
             right_obj -= 1;
             rclip = f32::min(rclip, box_min);
         }
@@ -76,8 +76,8 @@ pub fn sort_objects(
 
 #[derive(Debug)]
 struct StackFrame {
-    start: usize,
-    stop: usize,
+    start: u32,
+    stop: u32,
     bbox: Aabb,
     node_index: ObjIndex,
 }
@@ -97,23 +97,24 @@ pub fn index_of_max(vec: &Vec3) -> u8 {
 }
 
 pub fn compute_bih(
-    leaf_bound: usize,
+    leaf_bound: u32,
     bboxes: &[Aabb],
     global: &Aabb,
-    index: &mut [usize],
+    index: &mut [u32],
     nodes: &mut Vec<Node>,
 ) {
     let mut stack: Vec<StackFrame> = Vec::new();
     let size = bboxes.len();
+    assert!(size < u32::MAX as usize);
     *nodes = Vec::with_capacity(2 * size);
     unsafe { nodes.set_len(size) };
     let init_frame = StackFrame {
         start: 0,
-        stop: index.len() - 1,
+        stop: index.len() as u32 - 1,
         bbox: global.clone(),
         node_index: 0,
     };
-    let mut cursor: usize = &init_frame.node_index + 1;
+    let mut cursor: u32 = &init_frame.node_index + 1;
     stack.push(init_frame);
 
     'construction: loop {
@@ -125,7 +126,7 @@ pub fn compute_bih(
                 let local_bbox = &mut frame.bbox;
                 if stop - start < leaf_bound {
                     let node = Node::Leaf { start, stop };
-                    nodes[frame.node_index] = node;
+                    nodes[frame.node_index as usize] = node;
                 } else {
                     let exts = crate::aabb::extents(local_bbox);
 
@@ -146,7 +147,7 @@ pub fn compute_bih(
                             } else {
                                 let next = (dim + 1) % 3;
                                 if next == maxdim {
-                                    nodes[frame.node_index] = Node::Leaf { start, stop };
+                                    nodes[frame.node_index as usize] = Node::Leaf { start, stop };
                                     break 'retry;
                                 } else {
                                     dim = next;
@@ -160,7 +161,7 @@ pub fn compute_bih(
                             } else {
                                 let next = (dim + 1) % 3;
                                 if next == maxdim {
-                                    nodes[frame.node_index] = Node::Leaf { start, stop };
+                                    nodes[frame.node_index as usize] = Node::Leaf { start, stop };
                                     break 'retry;
                                 } else {
                                     dim = next;
@@ -196,7 +197,7 @@ pub fn compute_bih(
                             };
                             stack.push(right);
                             stack.push(left);
-                            nodes[frame.node_index] = node;
+                            nodes[frame.node_index as usize] = node;
                             continue 'construction;
                         }
                     }
@@ -206,11 +207,11 @@ pub fn compute_bih(
     }
 }
 
-pub fn alloc<E: Elt>(state: &E::State, objects: &[E::T], leaf_bound: usize) -> BihState {
+pub fn alloc<E: Elt>(state: &E::State, objects: &[E::T], leaf_bound: u32) -> BihState {
     let size = objects.len();
-    let mut index: Vec<usize> = vec![0; size];
+    let mut index: Vec<u32> = vec![0; size];
     for (i, x) in index.iter_mut().enumerate() {
-        *x = i;
+        *x = i as u32;
     }
 
     let mut global: Aabb = crate::aabb::EMPTY;
@@ -231,8 +232,8 @@ pub fn alloc<E: Elt>(state: &E::State, objects: &[E::T], leaf_bound: usize) -> B
     }
 }
 
-pub fn debug(bih: &BihState, node_index: usize, depth: usize) -> String {
-    let node = &bih.nodes[node_index];
+pub fn debug(bih: &BihState, node_index: u32, depth: usize) -> String {
+    let node = &bih.nodes[node_index as usize];
     match node {
         Node::Leaf { start, stop } => format!(
             "{:width$}Leaf start={start} stop={stop}\n",

@@ -191,6 +191,6 @@ impl crate::bih::Elt for Triangle {
     }
 }
 
-pub fn compute_bih(scene: &Scene, leaf_bound: usize) -> BihState {
+pub fn compute_bih(scene: &Scene, leaf_bound: u32) -> BihState {
     crate::bih::alloc::<Triangle>(scene, &scene.tbuffer, leaf_bound)
 }
