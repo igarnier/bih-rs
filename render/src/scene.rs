@@ -159,8 +159,6 @@ pub fn add_wavefront_to_scene(scene: &mut Scene, fname: &str) {
 
         tbuffer.append(&mut triangles);
 
-        assert!(mesh.vertices.len() % 3 == 0);
-
         for V3(v0, v1, v2) in mesh.vertices {
             let v = Vec3::new(200. * v0, 200. * v1, 800. + 200. * v2);
             vbuffer.push(v);
