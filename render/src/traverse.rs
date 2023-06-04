@@ -1,5 +1,5 @@
 use crate::bih::{BihState, Node};
-use crate::moller_trumbore::{test_intersection, Hit, Ray};
+use crate::moller_trumbore::{test_intersection, test_intersection_branchless, Hit, Ray};
 use crate::scene::Scene;
 use ultraviolet::vec as uv;
 use uv::Vec3;
@@ -19,28 +19,31 @@ pub fn intersect_ray(
         v: 0.0,
     };
 
-    let vbuffer = &scene.vbuffer;
-    let tbuffer = &scene.tbuffer;
-    let nbuffer = &scene.nbuffer;
+    let vbuffer: &[Vec3] = &scene.vbuffer;
+    let tbuffer: &[[u32; 3]] = &scene.tbuffer;
+    let nbuffer: &[Vec3] = &scene.nbuffer;
     let normal = ray.normal;
 
     for tri in *tri_start..=*tri_end {
         let i = index[tri as usize] as usize;
         let tri = tbuffer[i];
+        let t0 = tri[0] as usize;
+        let t1 = tri[1] as usize;
+        let t2 = tri[2] as usize;
         let trin = nbuffer[i];
 
         let dot = Vec3::dot(&normal, trin);
 
         if dot <= 0.0 {
-            let v0 = vbuffer[tri[0] as usize];
-            let v1 = vbuffer[tri[1] as usize];
-            let v2 = vbuffer[tri[2] as usize];
+            let v0 = vbuffer[t0];
+            let v1 = vbuffer[t1];
+            let v2 = vbuffer[t2];
             let mut hit = Hit {
                 t: 0.0,
                 u: 0.0,
                 v: 0.0,
             };
-            let res = test_intersection(ray, v0, v1, v2, &mut hit);
+            let res = test_intersection_branchless(ray, v0, v1, v2, &mut hit);
             if res && hit.t < min_hit.t && tmin <= hit.t && hit.t <= tmax {
                 min_hit = hit
             }
@@ -74,8 +77,8 @@ pub fn traverse(
             leftclip,
             rightclip,
             left,
-            right,
         } => {
+            let right = *left + 1;
             let dim = *axis as usize;
 
             let ray_start = ray.origin[dim] + ray.normal[dim] * tmin;
@@ -99,7 +102,7 @@ pub fn traverse(
                                         (rightclip - ray.origin[dim]) * ray.inormal[dim],
                                         tmin,
                                     );
-                                    traverse(scene, bih, *right, ray, near_clip, tmax)
+                                    traverse(scene, bih, right, ray, near_clip, tmax)
                                 } else {
                                     None
                                 }
@@ -110,7 +113,7 @@ pub fn traverse(
                         // boxes do overlap - we have to explore both boxes and pick the nearest hit
                         let near_clip =
                             f32::max((rightclip - ray.origin[dim]) * ray.inormal[dim], tmin);
-                        let right_hit = traverse(scene, bih, *right, ray, near_clip, tmax);
+                        let right_hit = traverse(scene, bih, right, ray, near_clip, tmax);
                         match (left_hit, right_hit) {
                             (None, None) => None,
                             (None, x) | (x, None) => x,
@@ -130,7 +133,7 @@ pub fn traverse(
                     // ray does not intersect left subspace but intersects right one
                     let near_clip =
                         f32::max((rightclip - ray.origin[dim]) * ray.inormal[dim], tmin);
-                    traverse(scene, bih, *right, ray, near_clip, tmax)
+                    traverse(scene, bih, right, ray, near_clip, tmax)
                 } else {
                     None
                 }
@@ -140,7 +143,7 @@ pub fn traverse(
                     // ray intersects right subspace
                     let far_clip = f32::min((rightclip - ray.origin[dim]) * ray.inormal[dim], tmax);
                     // explore right
-                    let right_hit = traverse(scene, bih, *right, ray, tmin, far_clip);
+                    let right_hit = traverse(scene, bih, right, ray, tmin, far_clip);
 
                     if leftclip < rightclip {
                         // boxes do not overlap - we explore the right if
