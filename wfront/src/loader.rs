@@ -107,7 +107,9 @@ pub fn load(filename: &str) -> Mesh {
     buf.split(|&c| c == b'\n')
         .into_iter()
         .fold((), |_acc, line| {
-            if line[0] == b'#' {
+            if line.len() == 0 {
+                ()
+            } else if line[0] == b'#' {
                 ()
             } else {
                 let line_as_str = std::str::from_utf8(line).unwrap();
