@@ -1,5 +1,5 @@
-use ultraviolet::vec as uv;
-use uv::Vec3;
+use ultraviolet::{f32x8, vec as uv};
+use uv::{Vec3, Vec3x8};
 
 const EPS: f32 = 0.0001;
 
@@ -10,11 +10,24 @@ pub struct Hit {
     pub v: f32,
 }
 
+#[derive(Debug)]
+pub struct Hit8 {
+    pub t: f32x8,
+    pub u: f32x8,
+    pub v: f32x8,
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct Ray {
     pub origin: Vec3,
     pub normal: Vec3,
     pub inormal: Vec3,
+}
+
+pub struct Ray8 {
+    pub origin: Vec3x8,
+    pub normal: Vec3x8,
+    pub inormal: Vec3x8,
 }
 
 pub fn new_hit() -> Hit {
@@ -28,6 +41,15 @@ pub fn new_hit() -> Hit {
 pub fn new_ray(origin: Vec3, normal: Vec3) -> Ray {
     let inormal = normal.map(|x| 1. / x);
     Ray {
+        origin,
+        normal,
+        inormal,
+    }
+}
+
+pub fn new_ray8(origin: Vec3x8, normal: Vec3x8) -> Ray8 {
+    let inormal = normal.map(|x| 1. / x);
+    Ray8 {
         origin,
         normal,
         inormal,
@@ -63,35 +85,59 @@ pub fn test_intersection(ray: &Ray, p0: Vec3, p1: Vec3, p2: Vec3, out: &mut Hit)
     }
 }
 
-// pub fn test_intersection_nobranch(
-//     ray: &Ray,
-//     p0: &Vec3,
-//     p1: &Vec3,
-//     p2: &Vec3,
-//     out: &mut Hit,
-// ) -> bool {
-//     let mut edge1 = crate::vec3::zero();
-//     let mut edge2 = crate::vec3::zero();
-//     let mut pvec = crate::vec3::zero();
-//     crate::vec3::sub(p1, p0, &mut edge1);
-//     crate::vec3::sub(p2, p0, &mut edge2);
-//     crate::vec3::cross(&ray.normal, &edge2, &mut pvec);
-//     let det = crate::vec3::dot(&edge1, &pvec);
-//     let test1 = !(det > -EPS && det < EPS);
-//     let inv_det = 1.0 / det;
-//     let mut tvec = crate::vec3::zero();
-//     crate::vec3::sub(&ray.origin, p0, &mut tvec);
-//     let ucoord = crate::vec3::dot(&tvec, &pvec) * inv_det;
-//     let test2 = !(ucoord < 0.0 || ucoord > 1.0);
-//     crate::vec3::cross(&tvec, &edge1, &mut pvec);
-//     let vcoord = crate::vec3::dot(&ray.normal, &pvec) * inv_det;
-//     let test3 = !(vcoord < 0.0 || ucoord + vcoord > 1.0);
-//     let hit_dist = crate::vec3::dot(&edge2, &pvec) * inv_det;
-//     out.t = hit_dist;
-//     out.u = ucoord;
-//     out.v = vcoord;
-//     (test1 as i32 * test2 as i32 * test3 as i32) != 0
-// }
+pub fn test_intersection_branchless(
+    ray: &Ray,
+    p0: Vec3,
+    p1: Vec3,
+    p2: Vec3,
+    out: &mut Hit,
+) -> bool {
+    let edge1 = p1 - p0;
+    let edge2 = p2 - p0;
+    let mut pvec = Vec3::cross(&ray.normal, edge2);
+    let det = Vec3::dot(&edge1, pvec);
+    let det_cond = det > -EPS && det < EPS;
+    let inv_det = 1.0 / det;
+    let tvec = ray.origin - p0;
+    let ucoord = Vec3::dot(&tvec, pvec) * inv_det;
+    let ucoord_cond = !(0.0..=1.0).contains(&ucoord);
+    pvec = Vec3::cross(&tvec, edge1);
+    let vcoord = Vec3::dot(&pvec, ray.normal) * inv_det;
+    let vcoord_cond = vcoord < 0.0 || ucoord + vcoord > 1.0;
+    let hit_dist = Vec3::dot(&pvec, edge2) * inv_det;
+    out.t = hit_dist;
+    out.u = ucoord;
+    out.v = vcoord;
+    !(det_cond || ucoord_cond || vcoord_cond)
+}
+
+pub fn test_intersection_branchless8(
+    ray: &Ray8,
+    p0: Vec3x8,
+    p1: Vec3x8,
+    p2: Vec3x8,
+    out: &mut Hit8,
+) -> f32x8 {
+    use wide::{CmpGe, CmpLe};
+    let edge1 = p1 - p0;
+    let edge2 = p2 - p0;
+    let mut pvec = Vec3x8::cross(&ray.normal, edge2);
+    let det: f32x8 = Vec3x8::dot(&edge1, pvec);
+    let det_mask = det.cmp_le(f32x8::splat(-EPS)) | det.cmp_ge(f32x8::splat(EPS));
+    let inv_det = 1.0 / det;
+    let tvec = ray.origin - p0;
+    let ucoord = Vec3x8::dot(&tvec, pvec) * inv_det;
+    let ucoord_mask = ucoord.cmp_ge(f32x8::splat(0.0)) & ucoord.cmp_le(f32x8::splat(1.0));
+    pvec = Vec3x8::cross(&tvec, edge1);
+    let vcoord = Vec3x8::dot(&pvec, ray.normal) * inv_det;
+    let vcoord_mask =
+        vcoord.cmp_ge(f32x8::splat(0.0)) | (ucoord + vcoord).cmp_le(f32x8::splat(1.0));
+    let hit_dist = Vec3x8::dot(&pvec, edge2) * inv_det;
+    out.t = hit_dist;
+    out.u = ucoord;
+    out.v = vcoord;
+    det_mask & ucoord_mask & vcoord_mask
+}
 
 #[cfg(test)]
 mod tests {
