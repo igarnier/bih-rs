@@ -20,7 +20,6 @@ pub enum Node {
         leftclip: f32,
         rightclip: f32,
         left: NodeIndex,
-        right: NodeIndex,
     },
 }
 
@@ -47,8 +46,8 @@ pub fn sort_objects(
     right_obj: u32,
 ) -> (ObjIndex, f32, f32, f32, f32) {
     assert!(left_obj < right_obj);
-    let mut left_obj: u32 = left_obj;
-    let mut right_obj: u32 = right_obj;
+    let mut left_obj = left_obj as i64;
+    let mut right_obj = right_obj as i64;
     let mut lclip: f32 = -f32::MAX;
     let mut rclip: f32 = f32::MAX;
     let mut lmin: f32 = f32::MAX;
@@ -71,7 +70,7 @@ pub fn sort_objects(
         }
     }
 
-    (left_obj, lclip, rclip, lmin, rmax)
+    (left_obj as u32, lclip, rclip, lmin, rmax)
 }
 
 #[derive(Debug)]
@@ -193,7 +192,7 @@ pub fn compute_bih(
                                 leftclip: lclip,
                                 rightclip: rclip,
                                 left: left_index,
-                                right: right_index,
+                                // right: right_index = left_index + 1,
                             };
                             stack.push(right);
                             stack.push(left);
@@ -244,11 +243,10 @@ pub fn debug(bih: &BihState, node_index: u32, depth: usize) -> String {
             axis,
             leftclip,
             rightclip,
-            left,
-            right,
+            left: l,
         } => {
-            let left = debug(bih, *left, depth + 1);
-            let right = debug(bih, *right, depth + 1);
+            let left = debug(bih, *l, depth + 1);
+            let right = debug(bih, *l + 1, depth + 1);
             format!(
                 "Node axis={axis}, lclip={leftclip}, rclip={rightclip}\n{:width$}left={}{:width$}right={}",
                 "", left, "", right, width = depth
