@@ -1,5 +1,5 @@
-use crate::aabb::Aabb;
 use crate::bih::BihState;
+use crate::{aabb::Aabb, triaccel};
 use ultraviolet::vec as uv;
 use uv::Vec3;
 use wfront::loader::{Triangle as Tri, V3};
@@ -28,6 +28,7 @@ pub struct Scene {
     pub tbuffer: Vec<Triangle>,
     pub nbuffer: Vec<Vec3>,
     bboxes: Vec<Aabb>,
+    triaccels: Vec<triaccel::TriAccel>,
     pub global: Aabb,
 }
 
@@ -72,6 +73,7 @@ pub fn empty() -> Scene {
         vbuffer: Vec::new(),
         tbuffer: Vec::new(),
         nbuffer: Vec::new(),
+        triaccels: Vec::new(),
         bboxes: Vec::new(),
         global: crate::aabb::EMPTY,
     }
@@ -116,9 +118,9 @@ pub fn add_object_to_scene(
         t[1] += vcount as u32;
         t[2] += vcount as u32;
         let aabb = triangle_aabb(vbuffer, t);
-        // let p0 = vbuffer[t[0] as usize];
-        // let p1 = vbuffer[t[1] as usize];
-        // let p2 = vbuffer[t[2] as usize];
+        let p0 = vbuffer[t[0] as usize];
+        let p1 = vbuffer[t[1] as usize];
+        let p2 = vbuffer[t[2] as usize];
         // println!(
         //     "tri {:?} with coords {:?} has aabb {}",
         //     t,
@@ -128,6 +130,7 @@ pub fn add_object_to_scene(
         scene.tbuffer.push(*t);
         scene.global = crate::aabb::join(&aabb, &scene.global);
         scene.bboxes.push(aabb);
+        scene.triaccels.push(triaccel::precompute(p0, p1, p2));
     }
     scene.vbuffer.append(vbuffer);
     scene.nbuffer.append(nbuffer);

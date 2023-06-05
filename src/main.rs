@@ -1,6 +1,6 @@
 use clap::Parser;
-use moller_trumbore::Ray;
 use raylib::prelude::*;
+use render::types::Ray;
 use render::*;
 use scene;
 use std::str::FromStr;
@@ -87,7 +87,7 @@ pub fn main() {
             );
             normal.normalize();
             let inormal = normal.map(|x| 1. / x);
-            let ray = render::moller_trumbore::Ray {
+            let ray = Ray {
                 origin,
                 normal,
                 inormal,

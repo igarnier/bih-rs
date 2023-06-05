@@ -1,6 +1,7 @@
 use crate::bih::{BihState, Node};
-use crate::moller_trumbore::{test_intersection, test_intersection_branchless, Hit, Ray};
+use crate::moller_trumbore::{test_intersection, test_intersection_branchless};
 use crate::scene::Scene;
+use crate::types::{Hit, Ray};
 use ultraviolet::vec as uv;
 use uv::Vec3;
 
@@ -17,6 +18,7 @@ pub fn intersect_ray(
         t: f32::INFINITY,
         u: 0.0,
         v: 0.0,
+        dot: 0.0,
     };
 
     let vbuffer: &[Vec3] = &scene.vbuffer;
@@ -42,6 +44,7 @@ pub fn intersect_ray(
                 t: 0.0,
                 u: 0.0,
                 v: 0.0,
+                dot,
             };
             let res = test_intersection_branchless(ray, v0, v1, v2, &mut hit);
             if res && hit.t < min_hit.t && tmin <= hit.t && hit.t <= tmax {
