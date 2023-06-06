@@ -28,7 +28,7 @@ pub struct Scene {
     pub tbuffer: Vec<Triangle>,
     pub nbuffer: Vec<Vec3>,
     bboxes: Vec<Aabb>,
-    triaccels: Vec<triaccel::TriAccel>,
+    pub triaccels: Vec<triaccel::TriAccel>,
     pub global: Aabb,
 }
 

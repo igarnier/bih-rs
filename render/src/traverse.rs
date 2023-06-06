@@ -1,6 +1,6 @@
 use crate::bih::{BihState, Node};
-use crate::moller_trumbore::{test_intersection, test_intersection_branchless};
 use crate::scene::Scene;
+use crate::triaccel::{triaccel_intersect, TriAccel};
 use crate::types::{Hit, Ray};
 use ultraviolet::vec as uv;
 use uv::Vec3;
@@ -21,37 +21,23 @@ pub fn intersect_ray(
         dot: 0.0,
     };
 
-    let vbuffer: &[Vec3] = &scene.vbuffer;
-    let tbuffer: &[[u32; 3]] = &scene.tbuffer;
-    let nbuffer: &[Vec3] = &scene.nbuffer;
-    let normal = ray.normal;
+    let abuffer: &[TriAccel] = &scene.triaccels;
 
     for tri in *tri_start..=*tri_end {
         let i = index[tri as usize] as usize;
-        let tri = tbuffer[i];
-        let t0 = tri[0] as usize;
-        let t1 = tri[1] as usize;
-        let t2 = tri[2] as usize;
-        let trin = nbuffer[i];
+        let triaccel = &abuffer[i];
+        let mut hit = Hit {
+            t: 0.0,
+            u: 0.0,
+            v: 0.0,
+            dot: 0.0,
+        };
 
-        let dot = Vec3::dot(&normal, trin);
-
-        if dot <= 0.0 {
-            let v0 = vbuffer[t0];
-            let v1 = vbuffer[t1];
-            let v2 = vbuffer[t2];
-            let mut hit = Hit {
-                t: 0.0,
-                u: 0.0,
-                v: 0.0,
-                dot,
-            };
-            let res = test_intersection_branchless(ray, v0, v1, v2, &mut hit);
-            if res && hit.t < min_hit.t && tmin <= hit.t && hit.t <= tmax {
-                min_hit = hit
-            }
+        if triaccel_intersect(&triaccel, ray, tmin, tmax, &mut hit) && hit.t < min_hit.t {
+            min_hit = hit
         }
     }
+
     if min_hit.t == f32::INFINITY {
         None
     } else {
