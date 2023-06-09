@@ -1,15 +1,16 @@
 use clap::Parser;
 use raylib::prelude::*;
 use render::types::Ray;
-use render::*;
-use scene;
+use render::{scene, trace, types};
+
 use std::str::FromStr;
 use ultraviolet::Vec3;
 use wfront::loader::{load, Mesh};
 
 fn parse_r(arg: &str) -> Result<WindowResolution, std::io::Error> {
-    let mut cs = arg.split("x");
-    let Some(xres) = cs.next() else { return Err(std::io::Error::new(std::io::ErrorKind::Other, "not a complex")) };
+    let mut cs = arg.split('x');
+    let Some(xres) = cs.next() else
+    { return Err(std::io::Error::new(std::io::ErrorKind::Other, "not a complex")) };
     let Ok (xres) = u32::from_str(xres) else { return Err(std::io::Error::new(std::io::ErrorKind::Other, "not a complex")) };
     let xres = xres - (xres % 10);
     let Some(yres) = cs.next() else { return Err(std::io::Error::new(std::io::ErrorKind::Other, "not a complex")) };
@@ -58,7 +59,19 @@ pub fn main() {
     let mut scene = render::scene::empty();
     render::scene::add_wavefront_to_scene(&mut scene, &args.filename);
 
-    use std::time::{Duration, Instant};
+    scene
+        .materials
+        .push(types::default_material(Vec3::new(1.0, 1.0, 1.0)));
+
+    scene.lights.push(types::Light {
+        position: Vec3::new(0.0, 0.0, 0.0),
+        intensity: 100.0,
+        color: Vec3::new(1.0, 1.0, 1.0),
+    });
+
+    // scene.ambient = Vec3::new(0.5, 0.5, 0.5);
+
+    use std::time::Instant;
 
     let now = Instant::now();
 
@@ -113,12 +126,13 @@ pub fn main() {
                 let index = y * 800 + x;
                 let ray = rays[index];
 
-                let hit = render::traverse::traverse(&scene, &bih, 0, &ray, 0.0, f32::MAX);
+                let color_vec = render::trace::raytrace(1, &scene, &bih, &ray);
+                let r = (color_vec.x.clamp(0.0, 1.) * 255.) as u8;
+                let g = (color_vec.y.clamp(0.0, 1.) * 255.) as u8;
+                let b = (color_vec.z.clamp(0.0, 1.) * 255.) as u8;
+                let color = Color { r, g, b, a: 255 };
 
-                match hit {
-                    None => (),
-                    Some(_) => d.draw_pixel(x as i32, y as i32, Color::RED),
-                }
+                d.draw_pixel(x as i32, y as i32, color)
             }
         }
 

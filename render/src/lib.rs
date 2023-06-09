@@ -3,6 +3,7 @@ pub mod bih;
 pub mod camera;
 pub mod moller_trumbore;
 pub mod scene;
+pub mod trace;
 pub mod traverse;
 pub mod triaccel;
 pub mod types;

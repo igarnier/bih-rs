@@ -1,29 +1,24 @@
 use crate::bih::BihState;
+use crate::types::{Light, Material};
 use crate::{aabb::Aabb, triaccel};
 use ultraviolet::vec as uv;
 use uv::Vec3;
 use wfront::loader::{Triangle as Tri, V3};
 
-// struct Light {
-//     position: Vec3,
-//     intensity: f32,
-//     color: Vec3,
-// }
-
-// struct Material {
-//     m_color: Vec3,
-//     m_diffuse: f32,
-//     m_specular: f32,
-//     m_shininess: f32,
-// }
-
 pub type Vertex = Vec3;
-pub type Triangle = [u32; 3];
+
+#[derive(Clone, Copy)]
+pub struct Triangle {
+    pub t0: u32,
+    pub t1: u32,
+    pub t2: u32,
+    pub mat: u32,
+}
 
 pub struct Scene {
-    ambient: Vec3,
-    // lights: Vec<Light>,
-    // materials: Vec<Material>,
+    pub ambient: Vec3,
+    pub lights: Vec<Light>,
+    pub materials: Vec<Material>,
     pub vbuffer: Vec<Vertex>,
     pub tbuffer: Vec<Triangle>,
     pub nbuffer: Vec<Vec3>,
@@ -46,11 +41,11 @@ impl Iterator for TriangleIterator<'_> {
             None
         } else {
             let current = self.current;
-            let vbuffer = &self.vbuffer;
-            let tri = self.tbuffer[current];
-            let v0 = vbuffer[tri[0] as usize];
-            let v1 = vbuffer[tri[1] as usize];
-            let v2 = vbuffer[tri[2] as usize];
+            let vbuffer = self.vbuffer;
+            let tri = &self.tbuffer[current];
+            let v0 = vbuffer[tri.t0 as usize];
+            let v1 = vbuffer[tri.t1 as usize];
+            let v2 = vbuffer[tri.t2 as usize];
             self.current += 1;
             Some((v0, v1, v2))
         }
@@ -68,8 +63,8 @@ pub fn iter_triangles(scene: &Scene) -> TriangleIterator {
 pub fn empty() -> Scene {
     Scene {
         ambient: Vec3::zero(),
-        // lights: Vec::new(),
-        // materials: Vec::new(),
+        lights: Vec::new(),
+        materials: Vec::new(),
         vbuffer: Vec::new(),
         tbuffer: Vec::new(),
         nbuffer: Vec::new(),
@@ -79,27 +74,10 @@ pub fn empty() -> Scene {
     }
 }
 
-// pub fn triangle_aabb(vbuffer: &[Vertex], triangle: &Triangle) -> Aabb {
-//     let x = triangle[0] as usize;
-//     let y = triangle[1] as usize;
-//     let z = triangle[2] as usize;
-//     let p0 = vbuffer[x];
-//     let p1 = vbuffer[y];
-//     let p2 = vbuffer[z];
-//     let mut aabb = crate::aabb::EMPTY;
-//     aabb = crate::aabb::join_point(&aabb, &p0);
-//     aabb = crate::aabb::join_point(&aabb, &p1);
-//     aabb = crate::aabb::join_point(&aabb, &p2);
-//     aabb
-// }
-
-pub fn triangle_aabb(vbuffer: &[Vertex], triangle: &Triangle) -> Aabb {
-    let x = triangle[0] as usize;
-    let y = triangle[1] as usize;
-    let z = triangle[2] as usize;
-    let p0 = vbuffer[x];
-    let p1 = vbuffer[y];
-    let p2 = vbuffer[z];
+pub fn triangle_aabb(vbuffer: &[Vertex], tri: &Triangle) -> Aabb {
+    let p0 = vbuffer[tri.t0 as usize];
+    let p1 = vbuffer[tri.t1 as usize];
+    let p2 = vbuffer[tri.t2 as usize];
     let maxs = p0.max_by_component(p1).max_by_component(p2);
     let mins = p0.min_by_component(p1).min_by_component(p2);
     crate::aabb::make(mins, maxs)
@@ -114,19 +92,13 @@ pub fn add_object_to_scene(
     let vcount = scene.vbuffer.len();
 
     for t in tbuffer.iter_mut() {
-        t[0] += vcount as u32;
-        t[1] += vcount as u32;
-        t[2] += vcount as u32;
+        t.t0 += vcount as u32;
+        t.t1 += vcount as u32;
+        t.t2 += vcount as u32;
         let aabb = triangle_aabb(vbuffer, t);
-        let p0 = vbuffer[t[0] as usize];
-        let p1 = vbuffer[t[1] as usize];
-        let p2 = vbuffer[t[2] as usize];
-        // println!(
-        //     "tri {:?} with coords {:?} has aabb {}",
-        //     t,
-        //     (p0, p1, p2),
-        //     aabb
-        // );
+        let p0 = vbuffer[t.t0 as usize];
+        let p1 = vbuffer[t.t1 as usize];
+        let p2 = vbuffer[t.t2 as usize];
         scene.tbuffer.push(*t);
         scene.global = crate::aabb::join(&aabb, &scene.global);
         scene.bboxes.push(aabb);
@@ -141,13 +113,10 @@ pub fn add_wavefront_to_scene(scene: &mut Scene, fname: &str) {
 
     let mut tbuffer: Vec<Triangle> = Vec::new();
     let mut vbuffer: Vec<Vec3> = Vec::new();
-    // let mut nbuffer: Vec<Vec3> = Vec::new();
 
-    println!("adding {fname}");
+    println!("Loading {fname}");
 
     {
-        // let mut next_face = 0;
-
         println!(
             "vertices = {}; triangles = {}",
             mesh.vertices.len(),
@@ -157,13 +126,18 @@ pub fn add_wavefront_to_scene(scene: &mut Scene, fname: &str) {
         let mut triangles: Vec<Triangle> = mesh
             .triangles
             .iter()
-            .map(|Tri(t0, t1, t2)| [*t0 - 1, *t1 - 1, *t2 - 1])
+            .map(|Tri(t0, t1, t2)| Triangle {
+                t0: (*t0 - 1),
+                t1: (*t1 - 1),
+                t2: (*t2 - 1),
+                mat: 0,
+            })
             .collect();
 
         tbuffer.append(&mut triangles);
 
-        for V3(v0, v1, v2) in mesh.vertices {
-            let v = Vec3::new(200. * v0, 200. * v1, 800. + 200. * v2);
+        for V3(x, y, z) in mesh.vertices {
+            let v = Vec3::new(200. * x, 200. * y, 800. + 200. * z);
             vbuffer.push(v);
         }
     }
@@ -171,12 +145,10 @@ pub fn add_wavefront_to_scene(scene: &mut Scene, fname: &str) {
     let mut nbuffer = tbuffer
         .iter()
         .map(|t| {
-            let v0 = vbuffer[t[0] as usize];
-            let v1 = vbuffer[t[1] as usize];
-            let v2 = vbuffer[t[2] as usize];
-            let mut res = (v1 - v0).cross(v2 - v0);
-            res.normalize();
-            res
+            let v0 = vbuffer[t.t0 as usize];
+            let v1 = vbuffer[t.t1 as usize];
+            let v2 = vbuffer[t.t2 as usize];
+            (v1 - v0).cross(v2 - v0).normalized()
         })
         .collect();
 

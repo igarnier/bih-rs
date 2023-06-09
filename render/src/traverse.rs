@@ -2,8 +2,6 @@ use crate::bih::{BihState, Node};
 use crate::scene::Scene;
 use crate::triaccel::{triaccel_intersect, TriAccel};
 use crate::types::{Hit, Ray};
-use ultraviolet::vec as uv;
-use uv::Vec3;
 
 pub fn intersect_ray(
     scene: &Scene,
@@ -19,22 +17,24 @@ pub fn intersect_ray(
         u: 0.0,
         v: 0.0,
         dot: 0.0,
+        tri: 0,
     };
 
     let abuffer: &[TriAccel] = &scene.triaccels;
 
     for tri in *tri_start..=*tri_end {
-        let i = index[tri as usize] as usize;
-        let triaccel = &abuffer[i];
+        let i = index[tri as usize];
+        let triaccel = &abuffer[i as usize];
         let mut hit = Hit {
             t: 0.0,
             u: 0.0,
             v: 0.0,
             dot: 0.0,
+            tri: i,
         };
 
         if triaccel_intersect(&triaccel, ray, tmin, tmax, &mut hit) && hit.t < min_hit.t {
-            min_hit = hit
+            min_hit = hit;
         }
     }
 

@@ -93,8 +93,6 @@ pub fn precompute(a: Vec3, b: Vec3, c: Vec3) -> TriAccel {
     out
 }
 
-// Calcule l'intersection s'il y a intersection
-// Wald powered
 pub fn triaccel_intersect(tri: &TriAccel, ray: &Ray, tmin: f32, tmax: f32, hit: &mut Hit) -> bool {
     let dir = ray.normal.as_array();
     let nd: f32 =
