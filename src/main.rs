@@ -56,8 +56,14 @@ pub fn main() {
         .title("BIH")
         .build();
 
-    let mut scene = render::scene::empty();
-    render::scene::add_wavefront_to_scene(&mut scene, &args.filename);
+    let mut scene = render::scene::Scene::new();
+    let _obj = scene.add_wavefront(Vec3::new(3.5, 0.0, 0.0), &args.filename);
+    let _obj = scene.add_wavefront(Vec3::new(-3.5, 0.0, 0.0), &args.filename);
+    let _obj = scene.add_wavefront(Vec3::new(0.0, -5.0, 0.0), "plane.obj");
+
+    // need proper BIH construction
+    // obj.set_position(Vec3::new(1., 1., 0.));
+    // scene.refresh_triaccel(&obj);
 
     scene
         .materials
@@ -69,11 +75,17 @@ pub fn main() {
         color: Vec3::new(1.0, 0.0, 0.0),
     });
 
+    scene.lights.push(types::Light {
+        position: Vec3::new(-5.0, 5.0, -10.0),
+        intensity: 5.0,
+        color: Vec3::new(0.0, 0.0, 1.0),
+    });
+
     use std::time::Instant;
 
     let now = Instant::now();
 
-    let bih = scene::compute_bih(&scene, 5);
+    let bih = scene::compute_bih(&scene, 6);
 
     let elapsed = now.elapsed().as_nanos();
 
@@ -96,7 +108,7 @@ pub fn main() {
         let now = Instant::now();
 
         camera.iter_rays(800, 600).for_each(|(x, y, ray)| {
-            let color_vec = render::trace::raytrace(1, &scene, &bih, &ray);
+            let color_vec = render::trace::raytrace(2, &scene, &bih, &ray);
             let r = (color_vec.x.clamp(0., 1.) * 255.) as u8;
             let g = (color_vec.y.clamp(0., 1.) * 255.) as u8;
             let b = (color_vec.z.clamp(0., 1.) * 255.) as u8;
