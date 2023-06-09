@@ -1,7 +1,7 @@
 use clap::Parser;
 use raylib::prelude::*;
 use render::types::Ray;
-use render::{scene, trace, types};
+use render::{camera, scene, trace, types};
 
 use std::str::FromStr;
 use ultraviolet::Vec3;
@@ -69,8 +69,6 @@ pub fn main() {
         color: Vec3::new(1.0, 1.0, 1.0),
     });
 
-    // scene.ambient = Vec3::new(0.5, 0.5, 0.5);
-
     use std::time::Instant;
 
     let now = Instant::now();
@@ -81,33 +79,12 @@ pub fn main() {
 
     println!("Construction time: {elapsed} ns");
 
-    let dummy_ray = Ray {
-        origin: Vec3::zero(),
-        normal: Vec3::zero(),
-        inormal: Vec3::zero(),
-    };
-
-    let mut rays = vec![dummy_ray; (xres * yres) as usize];
-
-    for x in 0..xres {
-        for y in 0..yres {
-            let index = (y * xres + x) as usize;
-            let origin = Vec3::new(0.0, 0.0, -(yres as f32) / 2.0);
-            let mut normal = Vec3::new(
-                x as f32 - (xres as f32) / 2.,
-                y as f32 - (yres as f32) / 2.,
-                yres as f32 / 2.0,
-            );
-            normal.normalize();
-            let inormal = normal.map(|x| 1. / x);
-            let ray = Ray {
-                origin,
-                normal,
-                inormal,
-            };
-            rays[index] = ray;
-        }
-    }
+    let camera = camera::from_angle_axis(
+        Vec3::new(0.0, 0.0, -(yres as f32 / 2.)),
+        300.,
+        0.0,
+        Vec3::new(0.0, 1.0, 0.0),
+    );
 
     let mut iter = 0;
 
@@ -121,20 +98,15 @@ pub fn main() {
 
         let now = Instant::now();
 
-        for x in 0..800 {
-            for y in 0..600 {
-                let index = y * 800 + x;
-                let ray = rays[index];
+        camera.iter_rays(800, 600).for_each(|(x, y, ray)| {
+            let color_vec = render::trace::raytrace(1, &scene, &bih, &ray);
+            let r = (color_vec.x.clamp(0.0, 1.) * 255.) as u8;
+            let g = (color_vec.y.clamp(0.0, 1.) * 255.) as u8;
+            let b = (color_vec.z.clamp(0.0, 1.) * 255.) as u8;
+            let color = Color { r, g, b, a: 255 };
 
-                let color_vec = render::trace::raytrace(1, &scene, &bih, &ray);
-                let r = (color_vec.x.clamp(0.0, 1.) * 255.) as u8;
-                let g = (color_vec.y.clamp(0.0, 1.) * 255.) as u8;
-                let b = (color_vec.z.clamp(0.0, 1.) * 255.) as u8;
-                let color = Color { r, g, b, a: 255 };
-
-                d.draw_pixel(x as i32, y as i32, color)
-            }
-        }
+            d.draw_pixel(x as i32, y as i32, color)
+        });
 
         let elapsed = now.elapsed().as_millis();
 
