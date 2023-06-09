@@ -3,10 +3,13 @@ use ultraviolet::bivec::Bivec3;
 use ultraviolet::rotor::Rotor3;
 use ultraviolet::vec::Vec3;
 
+#[derive(Clone)]
 pub struct Camera {
-    pub pos: Vec3,
-    pub rot: Rotor3,
-    pub eyedist: f32,
+    pos: Vec3,
+    rot: Rotor3,
+    eyedist: f32,
+    screen_height: f32,
+    screen_width: f32,
 }
 
 pub struct RayIterator<'a> {
@@ -14,17 +17,21 @@ pub struct RayIterator<'a> {
     yres: u32,
     x: u32,
     y: u32,
+    dx: f32,
+    dy: f32,
     cam: &'a Camera,
 }
 
-// let init ~position ~eyedist ~angle ~axis =
-//   {pos = position; rot = M3.rot3_axis axis angle; eyedist}
-
-pub fn from_angle_axis(pos: Vec3, eyedist: f32, angle: f32, axis: Vec3) -> Camera {
+pub fn new(screen_width: f32, screen_height: f32, eyedist: f32) -> Camera {
+    assert!(eyedist > 0.0);
+    assert!(screen_height > 0.0);
+    assert!(screen_width > 0.0);
     Camera {
-        pos,
+        pos: Vec3::new(0.0, 0.0, 0.0),
         eyedist,
-        rot: Rotor3::from_angle_plane(angle, Bivec3::from_normalized_axis(axis)),
+        rot: Rotor3::identity(),
+        screen_height,
+        screen_width,
     }
 }
 
@@ -37,8 +44,8 @@ impl Iterator for RayIterator<'_> {
         } else {
             let x = self.x;
             let y = self.y;
-            let ray_x = (x as f32) - (self.xres / 2) as f32;
-            let ray_y = (y as f32) - (self.yres / 2) as f32;
+            let ray_x = self.dx * 0.5 + ((x as f32) - (self.xres / 2) as f32) * self.dx;
+            let ray_y = self.dy * 0.5 + ((y as f32) - (self.yres / 2) as f32) * self.dy;
             let ray_vec = Vec3::new(ray_x, ray_y, self.cam.eyedist).normalized();
             let normal = self.cam.rot * ray_vec;
             let inormal = normal.map(|x| 1. / x);
@@ -67,7 +74,21 @@ impl Camera {
             yres,
             x: 0,
             y: 0,
+            dx: self.screen_width / xres as f32,
+            dy: self.screen_height / yres as f32,
             cam: self,
         }
+    }
+
+    pub fn set_position(&self, position: Vec3) -> Self {
+        let mut c = self.clone();
+        c.pos = position;
+        c
+    }
+
+    pub fn set_orientation_angle_axis(&self, angle: f32, axis: Vec3) -> Self {
+        let mut c = self.clone();
+        c.rot = Rotor3::from_angle_plane(angle, Bivec3::from_normalized_axis(axis));
+        c
     }
 }
